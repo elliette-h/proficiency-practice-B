@@ -1,0 +1,11 @@
+(gdb) show commands
+    3  print reader
+    4  print token
+    5  p *token
+    6  p *reader
+    7  quit
+    8  r testcases/multi_op_err2.s
+    9  bt
+   10  p val_a->val
+   11  quit
+   12  show commands

@@ -1,0 +1,500 @@
+   19          char* label = malloc(b + 1);
+   20          if(!label) {
+   21            intr->had_error = true;
+   22            break;
+   23          }
+   24          for(int i = 0; i < b; i++) {
+   25            label[i] = cmd->val_a.as.str[i];
+   26          }
+   27          label[b] = '\0';
+   28          bool branch = false;
+   29          switch (cmd->branch_condition) {
+   30            case BRANCH_ALWAYS: {
+   31              branch = true;
+   32              break;
+   33            } case BRANCH_EQUAL: {
+   34              branch = intr->is_equal;
+   35              break;
+   36            } case BRANCH_NOT_EQUAL: {
+   37              branch = !intr->is_equal;
+   38              break;
+   39            } case BRANCH_GREATER: {
+   40              branch = intr->is_greater;
+   41              break;
+   42            } case BRANCH_LESS: {
+   43              branch = intr->is_less;
+   44              break;
+   45            } case BRANCH_GREATER_EQUAL: {
+   46              branch = intr->is_greater || intr->is_equal;
+   47              break;
+   48            } case BRANCH_LESS_EQUAL: {
+   49              branch = intr->is_less || intr->is_equal;
+   50              break;
+   51            } case BRANCH_NONE: {
+   52              branch = false;
+   53              break;
+   54            }
+   55          }
+   56          if(branch) {
+   57            Command *next_branch = ht_get(ht, label);
+   58            //printf("DEBUG: Branching to '%s', found cmd type: %d\n", label, next_branch ? (int)next_branch->type : -1);
+   59            if(!next_branch) {
+   60              printf("Label not found: %s\n", label);
+   61              intr->had_error = true;
+   62              break;
+   63            }
+   64            free(label);
+   65            cmd = next_branch;
+   66            continue;
+   67          }
+   68          free(label);
+   69          break;
+   70        }
+   71        case CMD_CALL: {
+   72          b = eval(intr, cmd->val_b);
+   73          char* label = malloc(b + 1);
+   74          if(!label) {
+   75            intr->had_error = true;
+   76            break;
+   77          }
+   78          for(int i = 0; i < b; i++) {
+   79            label[i] = cmd->val_a.as.str[i];
+   80          }
+   81          label[b] = '\0';
+   82          Command *next_func = ht_get(ht, label);
+   83          free(label);
+   84          if(!next_func) {
+   85            intr->had_error = true;
+   86            break;
+   87          }
+   88          StackFrame *frame = malloc(sizeof(StackFrame));
+   89          if(!frame) {
+   90            intr->had_error = true;
+   91            break;
+   92          }
+   93          for(int i = 0; i < NUM_VARIABLES; i++) {
+   94            frame->variables[i] = intr->variables[i];
+   95          }
+   96          frame->return_address = cmd->next;
+   97          frame->next = intr->stack;
+   98          intr->stack = frame;
+   99          cmd = next_func;
+  100          continue;
+  101        }
+  102        case CMD_RET: {
+  103          if(!intr->stack) {
+  104            cmd = NULL;
+  105            break;
+  106          }
+  107          StackFrame *frame = intr->stack;
+  108          intr->stack = frame->next;
+  109          int64_t return_val = intr->variables[0];
+  110          for(int i = 1; i < NUM_VARIABLES; i++) {
+  111            intr->variables[i] = frame->variables[i];
+  112          }
+  113          intr->variables[0] = return_val;
+  114          Command *return_address = frame->return_address;
+  115          free(frame);
+  116          cmd = return_address;
+  117          continue;
+  118        }
+  119        default: {
+  120          intr->had_error = true;
+  121          break;
+  122        }
+  123      }
+  124      cmd = cmd->next;
+  125    }
+  126    while(intr->stack) {
+  127      StackFrame *frame = intr->stack;
+  128      intr->stack = frame->next;
+  129      free(frame);
+  130    }
+  131    // TODO: Implement the interpreter logic here.
+  132    // Loop through commands, execute them and update interpreter state.
+  133    // Should look a lot like the logic in `parser.c`, except now with command types as opposed to token types.
+  134  }
+  135  void print_interpreter_state(Interpreter *intr) {
+  136    if (!intr) {
+  137      return;
+  138    }
+  139    printf("Error: %d\n", intr->had_error);
+  140    printf("Flags:\n");
+  141    printf("Is greater: %d\n", intr->is_greater);
+  142    printf("Is equal: %d\n", intr->is_equal);
+  143    printf("Is less: %d\n", intr->is_less);
+  144    printf("\n");
+  145    printf("Variable values:\n");
+  146    for (size_t i = 0; i < NUM_VARIABLES; i++) {
+  147      printf("x%zu: %" PRId64 "", i, intr->variables[i]);
+  148      if (i < NUM_VARIABLES - 1) {
+  149        printf(", ");
+  150      }
+  151      if ((i + 1) % 8 == 0) {
+  152        printf("\n");
+  153      }
+  154  valgrind --leak-check=full --show-leak-kind=all --track-origins=yes
+  155  valgrind --leak-check=full --show-leak-kind=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s
+  156  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s
+  157  clear
+  158  make clean
+  159  make debug
+  160  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s
+  161  make clean
+  162  make debug
+  163  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s
+  164  make clean
+  165  make debug
+  166  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s
+  167  make clean
+  168  make debug
+  169  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s
+  170  make debug
+  171  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s
+  172  make clean
+  173  make test_week4
+  174  make clean
+  175  make debug
+  176  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s
+  177  make clean
+  178  make test_week4
+  179  make clean
+  180  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s
+  181  make debug
+  182  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s
+  183  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s -s
+  184  make clean
+  185  make debug
+  186  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s 
+  187  ./bin/ci -i ./testcases/week4/b.cond.s 
+  188  make debug
+  189  ./bin/ci -i ./testcases/week4/b.cond.s 
+  190  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s 
+  191  clean
+  192  make clean
+  193  make debug
+  194  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s 
+  195  ./bin/ci -i ./testcases/week4/b.cond.s
+  196  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s 
+  197  make debug
+  198  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s 
+  199  make debug
+  200  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s 
+  201  make clean
+  202  make debug
+  203  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s 
+  204  make clean
+  205  make debug
+  206  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s 
+  207  make debug
+  208  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s 
+  209  make debug
+  210  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s 
+  211  make debug
+  212  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./bin/ci -i ./testcases/week4/b.cond.s 
+  213  make test_week4
+  214  ./ci_reference -i 'testcases/week4/call_err2.s' -o ref.out
+  215      ./bin/ci -i 'testcases/week4/call_err2.s' -o ci.out
+  216      diff -u ref.out ci.out
+  217  make clean
+  218  make debug
+  219  gdb bin/ci
+  220  make clean
+  221  make debug
+  222  gdb bin/ci
+  223  make clean
+  224  gdb bin/ci
+  225  make clean
+  226  make debug
+  227  make clean
+  228  make debug
+  229  make clean
+  230  make debug
+  231  make clean
+  232  make debug
+  233  gdb bin/ci
+  234  make clean
+  235  make test_week4
+  236  make clean
+  237  make test_week4
+  238  make clean
+  239  make test_week4
+  240  make clean
+  241  make test_week4
+  242  make clean
+  243  make test_week4
+  244  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=42 ./bin/ci -i 'testcases/week4/b.gt_err.s'
+  245  make debug
+  246  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=42 ./bin/ci -i 'testcases/week4/b.gt_err.s'
+  247  clear
+  248  make clean
+  249  make debug
+  250  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=42 ./bin/ci -i 'testcases/week4/b.gt_err.s'
+  251  make clean
+  252  make test_week4
+  253  make clean
+  254  make debug
+  255  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=42 ./bin/ci -i 'testcases/week4/b.gt_err.s'
+  256  make clean
+  257  make test_week4
+  258  time valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=42 ./bin/ci -i 'testcases/week4/fib_recursive.s'
+  259  git add .
+  260  git commit -m "first final test"
+  261  git push
+  262  time valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=42 ./bin/ht_test -i 'testcases/hashtable/basic.trace'
+  263  make debug
+  264  time valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=42 ./bin/ht_test -i 'testcases/hashtable/basic.trace'
+  265  make debug
+  266  time valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=42 ./bin/ht_test -i 'testcases/hashtable/basic.trace'
+  267  make clean
+  268  make debug
+  269  time valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=42 ./bin/ht_test -i 'testcases/hashtable/basic.trace'
+  270  make debug
+  271  time valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=42 ./bin/ht_test -i 'testcases/hashtable/basic.trace'
+  272  make test_hashtable
+  273  git add .
+  274  git commit -m "final commit again (wont be last)"
+  275  make debug
+  276  time valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --error-exitcode=42 ./bin/ht_test -i 'testcases/hashtable/basic.trace'
+  277  make test_week4
+  278  make test_week4
+  279  make test_hashtable
+  280  git add .
+  281  git commit -m "final v2_V2"
+  282  git push
+  283  make clean
+  284  make test_week4
+  285  make clean
+  286  make test_week4
+  287  make clean
+  288  make test_week4
+  289  make clean
+  290  make test_week4
+  291  git add .
+  292  git commit -m "maybe more right" 
+  293  make clean
+  294  make test_week4
+  295  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  296  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  297  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  298  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  299  python3 driver.py -w1
+  300  python3 driver.py -w1
+  301  python3 driver.py -w1
+  302  python3 driver.py -w1
+  303  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  304  python3 driver.py -w1
+  305  python3 driver.py -w1
+  306  python3 driver.py -w1
+  307  python3 driver.py -w1
+  308  python3 driver.py -w1
+  309  make heap_runner
+  310  make heap_runner
+  311  make clean
+  312  make heap_runner
+  313  python3 driver.py -w1
+  314  python3 driver.py -w1
+  315  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  316  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  317  make debug
+  318  make clean
+  319  make debug
+  320  gdb ./umalloc
+  321  make clean
+  322  make debug
+  323  gdb ./runner
+  324  make clean
+  325  gdb ./runner
+  326  make clean
+  327  make debug
+  328  gdb ./runner
+  329  python3 driver.py -w1
+  330  python3 driver.py -w1
+  331  python3 driver.py -w1
+  332  make clean
+  333  make debug
+  334  gdb ./runner
+  335  make clean
+  336  make debug
+  337  gdb ./runner
+  338  python3 driver.py -w1
+  339  python3 driver.py -w1
+  340  make clean
+  341  make debug
+  342  gdb ./runner
+  343  make clean
+  344  python3 driver.py -w1
+  345  python3 driver.py -w1
+  346  python3 driver.py -w1
+  347  make clean
+  348  make debug 
+  349  gdb ./runner
+  350  make clean
+  351  python3 driver.py -w1
+  352  python3 driver.py -w1
+  353  python3 driver.py -w1
+  354  python3 driver.py -w1
+  355  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  356  git add .
+  357  git commit -m "week 1"
+  358  python3 driver.py -w1
+  359  make clean
+  360  make debug
+  361  ./bump_test
+  362  make debug
+  363  ./bump_test
+  364  make debug
+  365  ./bump_test
+  366  make clean
+  367  make clean
+  368  make debug
+  369  python3 driver.py  -w1
+  370  git add .
+  371  git commit -m
+  372  git commit -m "test"
+  373  git push
+  374  make clean
+  375  /usr/bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  376  /usr/bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  377  /usr/bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  378  /usr/bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  379  /usr/bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  380  /usr/bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  381  make clean
+  382  make debug 
+  383  ./runner ./traces/week2/complex/oom.rep
+  384  make clean
+  385  /usr/bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  386  /usr/bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  387  make clean
+  388  python3 driver.py  -w1
+  389  python3 driver.py  -w1
+  390  make debug
+  391  ./bump_test
+  392  make debug
+  393  make debug
+  394  ./bump_test
+  395  make debug
+  396  ./bump_test
+  397  make clean
+  398  make debug
+  399  ./bump_test
+  400  make clean
+  401  make debug
+  402  ./bump_test
+  403  python3 driver.py  -w1
+  404  make debug
+  405  python3 driver.py  -w1
+  406  ./bump_test
+  407  python3 driver.py  -w1
+  408  make debug
+  409  ./bump_test
+  410  make debug
+  411  ./bump_test
+  412  make debug
+  413  ./bump_test
+  414  make debug
+  415  ./bump_test
+  416  ./runner -r ./traces/week1/short1-bal.rep
+  417  make clean
+  418  make debug
+  419  ./bump_test
+  420  python3 driver.py -w1
+  421  git add .
+  422  git commit -m "week 1 again" 
+  423  python driver.py -w1
+  424  python3 driver.py -w1
+  425  python3 driver.py -w1
+  426  python3 driver.py -w1
+  427  python3 driver.py -w1
+  428  python3 driver.py -w1
+  429  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  430  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  431  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  432  python3 driver.py
+  433  python3 driver.py
+  434  python3 driver.py
+  435  python3 driver.py
+  436  python3 driver.py
+  437  python3 driver.py
+  438  python3 driver.py
+  439  git add .
+  440  git commit -m "week2 first"
+  441  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  442  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  443  git add .
+  444  git commit -m "week 2 attempt 2" 
+  445  /usr/bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  446  /usr/bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  447  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  448  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  449  /bin/python3 /u/elliette/mm-lab-elliette-h/driver.py
+  450  git .
+  451  git add .
+  452  git commit -m "again"
+  453  git push
+  454  quit
+  455  help
+  456  logout
+  457  git clone git@https://github.com/elliette-h/429-proficiency-practiceC
+  458  git clone git/github.com/elliette-h/429-proficiency-practiceC
+  459  git clone git@github.com/elliette-h/429-proficiency-practiceC
+  460  git clone git@github.com/elliette-h/429-proficiency-practiceC
+  461  git clone git@github.com:elliette-h/429-proficiency-practiceC.git
+  462  ls -al ~/.ssh
+  463  logout
+  464  git@github.com:elliette-h/429-proficiency-practiceC.g
+  465  git clone git@github.com:elliette-h/429-proficiency-practiceC.git
+  466  ls ~/.ssh
+  467  ssh -T git@github.com
+  468  git clone https://github.com/elliette-h/429-proficiency-practiceC.git
+  469  cd 429-proficiency-practiceC/
+  470  ./time-left.sh
+  471  cat README.md
+  472  pwd
+  473  cd .
+  474  pwd
+  475  cd ~
+  476  pwd
+  477  touch ~/.gdbinit
+  478  ls
+  479  ls -a
+  480  echo "set history save on"
+  481  echo "set history save on" > ~/.gdbinit
+  482  cat ~/.gdbinit
+  483  ssh-keygen -t ed25519
+  484  cat /u/elliette/.ssh/id_ed25519.pub
+  485  git clone git@github.com:elliette-h/429-proficiency-practiceC.git
+  486  rm 429-proficiency-practiceC
+  487  ls
+  488  ls
+  489  cd
+  490  pwd
+  491  logout
+  492  cd proficiency-practice-B
+  493  make
+  494  make check 
+  495  make debug
+  496  make clean
+  497  make debug
+  498  gdb mini_ci
+  499  make clena
+  500  make clean
+  501  make check
+  502  make clean
+  503  make 
+  504  make check
+  505  ls -l mini_ci_reference
+  506  make clean
+  507  make
+  508  chmod +x mini_ci_reference
+  509  ls -l mini_ci_reference
+  510  make clean
+  511  make check
+  512  make clean
+  513  make debug
+  514  gdb mini_ci
+  515  make clean
+  516  make check
+  517  history 
+  518  history > shell_logs.txt
